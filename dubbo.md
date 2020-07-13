@@ -43,7 +43,7 @@ SOA的两大基石： **RPC**+**MQ**
 + 降级和熔断 (Hystrix、sentinel)
 + 超时和重传 (timeout、retries)
 
-**高并发：**
+**高并发**
 
 + 异步 （异步回调机制）
 + 缓存 （redis、memcache）
@@ -51,7 +51,32 @@ SOA的两大基石： **RPC**+**MQ**
 
 #### 1.5 如何保证事务的一致性？
 
+#### 1.6 SpringCloud && dubbo
 
++ 基于tcp的RPC
+  + tcp网络通信（socket）
+  + 序列化与反序列化
+  + 反射
+  + 代理
++ 基于http的RPC
+  + 网络通信（url）
+  + 序列化（xml,json）
+
+#### 1.7 通信协议
+
++ web Service
+
+  基于http+xml
+
++ RestFul
+
+  基于http +json (使用url地址，拿到一个对象，这个对象是json格式的)
+
++ RMI
+
+  java内部的分布式通信协议
+
++ RPC
 
 ### 二、 Dubbo框架
 
