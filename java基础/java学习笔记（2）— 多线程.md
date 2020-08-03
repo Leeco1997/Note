@@ -102,7 +102,9 @@ public Enum State{
 
 ![image-20200720213144174](https://raw.githubusercontent.com/Leeco1997/images/master/img/weakReference.jpg)
 
-> 为了防止内存泄漏，需要手动删除。 map.remove()
+> 为了防止内存泄漏，需要手动删除。
+
+``` map.remove()/map.set()/map.get()```都可以实现自动清楚无效`Entry`。---这里可以结合线性探测法来考虑。
 
 
 
@@ -152,3 +154,96 @@ public class MonitorService {
 **单线程一定慢吗？**
 
 > 不一定。比如Redis。因为它是基于内存操作，这种情况下，单线程可以很高效的利用CPU
+
+#### 2.1 ThreadPoolExectuor
+
+##### 线程状态
+
+```xml
+*   RUNNING  111:     Accept new tasks and process queued tasks 
+*   SHUTDOWN 000:     Don't accept new tasks, but process queued tasks
+*   STOP     001:     Don't accept new tasks, don't process queued tasks,
+*                     and interrupt in-progress tasks
+*   TIDYING  010:     All tasks have terminated, workerCount is zero,
+*                     the thread transitioning to state TIDYING
+*                     will run the terminated() hook method
+*   TERMINATED 011:   terminated() has completed
+```
+
+```java
+//使用ctl表示状态的任务个数,合二为一，减少cas的操作  
+private final AtomicInteger ctl = new AtomicInteger(ctlOf(RUNNING, 0));
+//或运算，高3位表示状态
+private static int ctlOf(int rs, int wc) { return rs | wc; }
+```
+
+##### 构造方法
+
+```java
+//keepAliveTime是大于coreSize的线程，最大空闲时间  
+//maxSize只有在有界队列中才有效
+public ThreadPoolExecutor(int corePoolSize,
+                              int maximumPoolSize,
+                              long keepAliveTime,
+                              TimeUnit unit,
+                              BlockingQueue<Runnable> workQueue,
+                              ThreadFactory threadFactory,
+                              RejectedExecutionHandler handler) {
+        //……
+    }
+```
+
+##### 拒绝策略
+
++ AbortPolicy  抛出异常
++ DiscardPolicy
++ DiscardOldestPolicy
+
+> `dubbo`在抛出异常的时候会记录日志，并且dump栈信息；
+>
+> `netty`的实现是创建一个新的队列；
+>
+> `AMQ`是超时等待60s放入队列；
+>
+> `PinPoint`使用一个拒绝策略链，依次使用每一种拒绝策略
+
+##### newFixedExecutor
+
+`coreSize = maxSize`
+
+##### newCachedExecutor
+
+```java
+//使用同步队列，core Size= 0,maxSize = Integer.MAX_VALUE
+public static ExecutorService newCachedThreadPool(ThreadFactory threadFactory) {
+        return new ThreadPoolExecutor(0, Integer.MAX_VALUE,
+                                      60L, TimeUnit.SECONDS,
+                                      new SynchronousQueue<Runnable>(),
+                                      threadFactory);
+    }
+```
+
+> 线程数量可以不断增加，没有上限，空闲后1分钟会自动释放。
+>
+> 适合数量多，但是任务时间短的任务。
+
+##### newSIngledExecutor
+
+```java
+    public static ExecutorService newSingleThreadExecutor(ThreadFactory threadFactory) {
+       //使用了装饰者模式，防止调用里的方法
+        return new FinalizableDelegatedExecutorService
+            (new ThreadPoolExecutor(1, 1,
+                                    0L, TimeUnit.MILLISECONDS,
+                                    new LinkedBlockingQueue<Runnable>(),
+                                    threadFactory));
+    }
+```
+
+
+
+> 保证任务的执行可以串行执行，任务大于1的时候，会返给无界队列。
+
+vs 单线程：
+
++ 当某个任务运行异常的时候，会自动重新创建一个线程。换句话说，也就是可以保证有一个线程可用。
