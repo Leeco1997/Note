@@ -306,8 +306,6 @@ public  void method(){
 }
 ```
 
-
-
 ###  :zap:常见面试问题？
 
 #### 1. synchronized的底层实现？
