@@ -4,7 +4,137 @@
 
 ### :two: 存储引擎
 
+#### 2.1 各种常用引擎简介
+
+| Feature      | InnoDB   | MyISAM | BDB  | Archive   | NDB  | Memory |
+| ------------ | -------- | ------ | ---- | --------- | ---- | ------ |
+| 支持事务     | ✔        |        | ✔    |           |      |        |
+| 锁的粒度     | Row      | Table  | Page | Row       | Row  | Table  |
+| MVCC         | ✔        |        |      | ✔         | ✔    |        |
+| 存储限制     | 64TB     | No     | No   | No        | No   | Yes    |
+| B树索引      | ✔        | ✔      | ✔    |           | ✔    | ✔      |
+| 哈希索引     | ✔        |        |      |           | ✔    | ✔      |
+| 全文索引     | ✔(1.2.X) | ✔      |      |           |      |        |
+| 集群索引     | **✔**    |        |      |           |      |        |
+| 数据缓存     | ✔        |        |      |           |      | ✔      |
+| 索引缓存     | ✔        | ✔      |      |           | ✔    | ✔      |
+| 数据可压缩   |          | ✔      |      | ✔         |      |        |
+| 空间使用     | High     | Low    | Low  | Very  Low | Low  | N/A    |
+| 内存使用     | High     | Low    | Low  | Low       | High | Medium |
+| 批量插入速度 | Low      | High   | High | Very High | High | High   |
+| 支持外键     | ✔        |        |      |           |      |        |
+
++ innoDB
+  1. 支持事务、行锁、支持外键
+  2. MVCC 、一致性非锁读定
+  3. 插入缓冲、二次写、自适应哈希索引、预读
+  4. next-key 避免幻读
+  5. 聚集索引
++ myisam
+  1. 不支持事务、表锁、全文索引
+  2. 只缓存索引
++ memory
+  1. 表中的数据存放在`内存`中，所以适合存储临时数据【查询的中间集】
+  2. 哈希索引
++ NDB
+  1. `share nothing`的集群
+  2. 索引数据存放在内存，主键查询速度快
+  3. 需要数据库层完成 `join`操作
++ archive  
+  1. 数据行压缩后存储，适合存储归档数据，比如日志信息
+  2. 只支持`insert`   `select`
+
+#### 2.2 缓冲池
+
+具有多个缓冲池实例。
+
+<img src="E:\CS\cs-note\img\innodb.jpg" style="zoom: 33%;" />
+
++ Master Thread    负责异步刷新缓冲池的数据到磁盘  `checkPoint` 
++ IO Thread  负责IO的回调（因为innodb使用了很多AIO）
++ Purge Thread       回收undo页
++ Page Cleaner Thread   负责脏页的刷新
+
+**缓冲池的更新**
+
++ `LRU`    + `midpoint ` + `innodb_old_blocks_time`    最近最少使用
+
+  新读取到的页面，放到midpoint的位置，默认是5/8;防止某些sql操作把热点数据刷出缓存池，比如全表扫描。
+
+  在该 `innodb_old_blocks_time `    时间窗口内可以访问页面,而不将其移到LRU列表的尾巴，防止被刷新出去
+
++ `checkPoint`
+
+  ​	先写 redo log, 再修改数据库。  `ACID---D`
+
+  什么时候执行？
+
+  1. 保证LRU列表中有100个空闲页
+  2. 缓冲池的脏页占用达到75%
+  3. Master Thread开启事务后，每秒日志缓冲刷新一次到磁盘
+
+  
+
++ 重做日志缓冲池什么适合刷新到redo log ？
+
+  1. Master Thread 每秒刷新一次
+  2. 事务提交的时候
+  3. redo log buffer 剩余小于50%的时候
+
+
+
+#### 2.3 插入缓冲
+
++ insert buffer   `B+ tree`
+  非唯一的辅助索引
+
+#### 2.4 doubleCheck
+
+![double write架构.png](https://cdn.jsdelivr.net/gh/clawhub/image/diffuser/blog/19/11/21/b59293f27e6aef0b4749a0339f5332cc.jpg)
+
+1. 将脏页先复制到内存中的doublewrite buffer
+2. 通过doublewrite buffer分两次顺序的写入共享表空间的物理磁盘，然后马上调用fsync函数，同步磁盘，避免缓冲写带来的问题。
+3. 在完成doublewrite页的写入后，再将doublewrite buffer中的页写入各个表空间文件中。
+
+####  2.5 AIO
+
+​	IO merge(合并IO)
+
+####  2.6  刷新邻近页
+
+​	当刷新一个页的时候，会检测该页所在的区，如果是脏页，一起刷新。
+
 ### :three: 索引
+
+#### 3.1 B+树索引 /辅助索引/ 联合索引 /覆盖索引
+
++ 覆盖索引 - 从辅助索引中就能得到查询记录，不需要每一行的完整信息
+
+  `count(*) `
+
+#### 3.2 hash索引
+
+#### 3.3 全文索引
+
++ 倒排索引
+
+  {单词：单词所在的文档ID}
+
+   {code : (1:6),(4:8)}
+
++ 
+
+#### 3.4 自适应hash索引
+
+1. 只能适用于等值查询
+
+
+
+> use index / force index
+>
+> select * from table `USE index(a)` where a = 1 
+>
+> select * from table `force index(a)` where a = 1 
 
 | 红黑树                                                       | B树                                          | B+数                                                        |
 | ------------------------------------------------------------ | -------------------------------------------- | ----------------------------------------------------------- |
@@ -73,7 +203,68 @@ B+树只要遍历叶子节点就可以实现整棵树的遍历，而其他的树
 >
 > 4、隔离级别越高，越能保证数据的完整性和一致性，但是对并发性能的影响也越大。
 
-### :five: 日志
+### :five: 并发
+
+#### 5.1 锁
+
++ 共享锁
+
++ 排他锁
+
+  从上级往下加锁，意向锁
+
++ **死锁**
+
+  多个事务同时争夺锁资源而造成的互相等待现象。
+
+  `解决方案`
+
+  1. 超时回滚
+  2. wait-for graph  等待图，如果图出现回路，则是出现了死锁；回滚undo log最小的
+     + 锁的信息链表
+     + 事务等待的链表
+
+  写个死锁的sql
+
++ **锁的算法**
+
+  1. Record lock :单个行上的锁
+
+  2. Gap Lock: 锁定范围，但不包括记录本身
+
+  3.  :arrow_down_small:Next-key Lock: Gap lock + Record Lock
+
+     如果查询的列是唯一索引，则直接使用 record lock
+
+  
+
+  
+
+#### 5.2 MVCC
+
++ 一致性非锁定读
+
+  ​	读取的时候，不会等待锁的释放。直接读取该数据的一个快照，使用undo log实现。
+
+> 一个数据行可能有多个快照。不同的事务隔离级别，使用规则不同。
+
++ 显示加锁    `for update/lock in share mode`
+
+#### 5.3 自增长
+
+自增长的列必须是索引，而且必须是索引的第一列。
+
++ AUTO-INC Locking 
+
+  完成对自增长的sql语句后释放锁，而不是完成整个事务
+
++ mutex
+
+  如果是可预测的插入行数，可以使用mutex对内存中的计数器做累加操作
+
+#### 5.4 外键
+
+修改外键的值, 首先需要给父表加共享锁。 select ……lock in share mode.
 
 ### :six: 分布式数据库
 
@@ -181,3 +372,20 @@ RocketMQ首先会发送`预执行消息` 到MQ，然后进行本地事务，如�
 2. 事务的隔离级别
    1. 
 
+### :seven:日志
+
+#### 7.1 重做日志
+
++ redo log  事务
+
++ undo log     作用： 回滚/mvcc
+
+  undo log也会产生redo log
+
+  undo log页可以重用
+
+#### 7.2 二进制日志
+
+#### 7.3 慢查询日志
+
+#### 7.4 错误日志
