@@ -40,7 +40,7 @@
 
 > permit不能叠加，也就是说permit的个数要么是0，要么是1。
 
-![image-20200721155352706](https://raw.githubusercontent.com/Leeco1997/images/master/img/image-20200721155352706.png)
+![5](https://raw.githubusercontent.com/Leeco1997/images/master/img/image-20200721155352706.png)
 
 #### 1.6 守护线程
 
