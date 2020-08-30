@@ -74,9 +74,12 @@
 
 + 快照（snapshotting，RDB）
 
+  > 一种是内部调用`SAVE` `BGSAVE`把redis数据库中的数据保存成RDB文件
+  > BGSAVE的时候会启动另一个单线程。
+
 + 只追加文件 （append-only ﬁle,AOF）---常用
 
-  > 开启AOF持久化后每执行一条会更改Redis中的数据的命令，Redis就会将该命令写入硬盘中的AOF文件。为了兼顾数据和写入性能，用户可以考虑 **appendfsync** **everysec**选项 ，让Redis每秒同步一次AOF文件，性能不会受到影响。
+  > 开启AOF持久化后每执行一条会更改Redis中的数据的命令，Redis就会将该命令写入硬盘中的AOF文件。为了兼顾数据和写入性能，用户可以考虑 `append` ` fsync` ` everysec`**选项 ，让Redis每秒同步一次AOF文件，性能不会受到影响。
 
 ##### 3.4 分布式锁
 
